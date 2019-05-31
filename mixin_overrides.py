@@ -72,8 +72,9 @@ class Resource(Base):
         self.value = value
 
 
-class ResourcesBearer(EntryCommon):
+class ResourcesBearer(EntryCommon, Base):
     """Mixin class to provide resource forks to filesystem entries."""
+    __abstract__ = True
 
     def __init__(self, resource_enc="json", **kwargs):
         super(ResourcesBearer, self).__init__(**kwargs)
