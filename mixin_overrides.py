@@ -32,14 +32,6 @@ entry_table = Table(
     Column("name", String),
 )
 
-resource_table = Table(
-    "resources", metadata,
-    Column("id", ForeignKey("entry.id"), primary_key=True),
-    Column("name", String, primary_key=True),
-    Column("fsid", Integer, ForeignKey("filesystem.fsid"), nullable=False),
-    Column("value", String),
-)
-
 
 class FileSystem(object):
     def __init__(self, device, backend):
@@ -68,6 +60,20 @@ class Resource(object):
     def __init__(self, name, value):
         self.name = name
         self.value = value
+
+resource_table = Table(
+    "resources", metadata,
+    Column("id", ForeignKey("entry.id"), primary_key=True),
+    Column("name", String, primary_key=True),
+    Column("fsid", Integer, ForeignKey("filesystem.fsid"), nullable=False),
+    Column("value", String),
+)
+
+mapper(
+    Resource, resource_table,
+    properties={"owner": relationship(EntryCommon),
+                "filesystem": relationship(FileSystem)}
+)
 
 
 class ResourcesBearer(EntryCommon):
@@ -102,11 +108,6 @@ mapper(
         "filesystem": synonym("_filesystem"),
     },
     polymorphic_on=entry_table.c.entry_type,
-)
-mapper(
-    Resource, resource_table,
-    properties={"owner": relationship(EntryCommon),
-                "filesystem": relationship(FileSystem)}
 )
 
 
