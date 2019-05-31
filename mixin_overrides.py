@@ -116,30 +116,6 @@ class File(EntryCommon):
         self.content = content
 
 
-class Directory(ResourcesBearer, EntryCommon):
-    entries = association_proxy("directory_entries", "entry")
-
-    def __init__(self, name, entries=(), **kwargs):
-        super(Directory, self).__init__(name=name, **kwargs)
-        self.entries = entries
-
-    @EntryCommon.filesystem.setter
-    def filesystem(self, value):
-        super(Directory, type(self)).filesystem.__set__(self, value)
-        for entry in self.entries:
-            entry.filesystem = value
-
-
-class DirectoryEntry(object):
-
-    def __init__(self, entry):
-        super(DirectoryEntry, self).__init__()
-        self.entry = entry
-
-    def __repr__(self):
-        return "<DirectoryEntry @ {0:x}>".format(id(self))
-
-
 mapper(FileSystem, filesystem_table)
 mapper(
     EntryCommon, entry_table,
@@ -155,6 +131,22 @@ mapper(
                 "filesystem": relationship(FileSystem)}
 )
 mapper(File, file_table, inherits=EntryCommon, polymorphic_identity="file")
+
+
+class Directory(ResourcesBearer, EntryCommon):
+    entries = association_proxy("directory_entries", "entry")
+
+    def __init__(self, name, entries=(), **kwargs):
+        super(Directory, self).__init__(name=name, **kwargs)
+        self.entries = entries
+
+    @EntryCommon.filesystem.setter
+    def filesystem(self, value):
+        super(Directory, type(self)).filesystem.__set__(self, value)
+        for entry in self.entries:
+            entry.filesystem = value
+
+
 mapper(
     Directory, local_table=directory_table,
     inherits=EntryCommon, polymorphic_identity="directory",
@@ -163,6 +155,18 @@ mapper(
         "_resources": relationship(Resource),  # for ResourcesBearer
     }
 )
+
+
+class DirectoryEntry(object):
+
+    def __init__(self, entry):
+        super(DirectoryEntry, self).__init__()
+        self.entry = entry
+
+    def __repr__(self):
+        return "<DirectoryEntry @ {0:x}>".format(id(self))
+
+
 mapper(DirectoryEntry, directory_entry_table, properties={
     "directory": relationship(
         Directory,
