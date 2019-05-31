@@ -40,12 +40,6 @@ resource_table = Table(
     Column("value", String),
 )
 
-file_table = Table(
-    "file", metadata,
-    Column("id", ForeignKey("entry.id"), primary_key=True),
-    Column("content", String),
-)
-
 
 class FileSystem(object):
     def __init__(self, device, backend):
@@ -100,12 +94,6 @@ class ResourcesBearer(EntryCommon):
         }[self.resource_enc]
 
 
-class File(EntryCommon):
-    def __init__(self, name, content):
-        super(File, self).__init__(name=name)
-        self.content = content
-
-
 mapper(FileSystem, filesystem_table)
 mapper(
     EntryCommon, entry_table,
@@ -120,7 +108,18 @@ mapper(
     properties={"owner": relationship(EntryCommon),
                 "filesystem": relationship(FileSystem)}
 )
-mapper(File, file_table, inherits=EntryCommon, polymorphic_identity="file")
+
+
+class File(EntryCommon, Base):
+    __tablename__ = "file"
+    id = Column(ForeignKey("entry.id"), primary_key=True)
+    content = Column(String)
+
+    __mapper_args__ = {"polymorphic_identity": "file"}
+
+    def __init__(self, name, content):
+        super(File, self).__init__(name=name)
+        self.content = content
 
 
 class Directory(ResourcesBearer, EntryCommon, Base):
