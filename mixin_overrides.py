@@ -21,6 +21,24 @@ class ABCDeclarativeMeta(DeclarativeMeta, abc.ABCMeta):
 Base = declarative_base(metaclass=ABCDeclarativeMeta)
 
 
+class EntryInterface(metaclass=abc.ABCMeta):
+    """
+    Describes the interface that mixin classes for :meth:`EntryCommon` may
+    rely on. For example, ResourcesBearer relies on this interface to access
+    `EntryCommon` features which it can not inherit from due to SQLAlchemy
+    supporting single inheritance from mapped classes only.
+    """
+    @property
+    @abc.abstractmethod
+    def filesystem(self):
+        pass
+
+    @filesystem.setter
+    @abc.abstractmethod
+    def filesystem(self, value):
+        pass
+
+
 class FileSystem(Base):
     __tablename__ = "filesystem"
 
@@ -33,7 +51,7 @@ class FileSystem(Base):
         self.backend = backend
 
 
-class EntryCommon(Base):
+class EntryCommon(Base, EntryInterface):
     __tablename__ = "entry"
 
     id = Column(Integer, primary_key=True)
@@ -77,7 +95,7 @@ class Resource(Base):
         self.value = value
 
 
-class ResourcesBearer(metaclass=abc.ABCMeta):
+class ResourcesBearer(EntryInterface):
     """Mixin class to provide resource forks to filesystem entries."""
 
     @declared_attr
@@ -92,7 +110,11 @@ class ResourcesBearer(metaclass=abc.ABCMeta):
         super(ResourcesBearer, self).__init__(**kwargs)
         self.resource_enc = resource_enc
 
-    @EntryCommon.filesystem.setter
+    @property
+    def filesystem(self):
+        return super(ResourcesBearer, self).filesystem
+
+    @filesystem.setter
     def filesystem(self, value):
         super(ResourcesBearer, type(self)).filesystem.__set__(self, value)
         for res in self._resources:
