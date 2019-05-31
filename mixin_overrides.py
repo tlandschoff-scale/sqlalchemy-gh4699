@@ -1,12 +1,12 @@
 # coding: utf-8
-
+import abc
 import json
 import pickle
 import sys
 
 from sqlalchemy import Column, Integer, String, ForeignKey, MetaData, Table, \
     create_engine, Boolean
-from sqlalchemy.ext.declarative import declarative_base, synonym_for
+from sqlalchemy.ext.declarative import declarative_base, synonym_for, DeclarativeMeta
 from sqlalchemy.orm import relationship, backref, sessionmaker, mapper
 
 from sqlalchemy.ext.associationproxy import association_proxy
@@ -14,8 +14,12 @@ from sqlalchemy.ext.associationproxy import association_proxy
 
 # --[ Schema and mapped classes ]------------------------------------------
 
+class ABCDeclarativeMeta(DeclarativeMeta, abc.ABCMeta):
+    pass
+
+
 metadata = MetaData()
-Base = declarative_base(metadata=metadata)
+Base = declarative_base(metadata=metadata, metaclass=ABCDeclarativeMeta)
 
 filesystem_table = Table(
     "filesystem", metadata,
@@ -75,8 +79,16 @@ class Resource(Base):
         self.value = value
 
 
-class ResourcesBearer(object):
+class ResourcesBearer(metaclass=abc.ABCMeta):
     """Mixin class to provide resource forks to filesystem entries."""
+
+    @property
+    @abc.abstractmethod
+    def _resources(self):
+        """
+        Subclasses must replace this by a orm.relationship to Resource
+        instances.
+        """
 
     def __init__(self, resource_enc="json", **kwargs):
         super(ResourcesBearer, self).__init__(**kwargs)
