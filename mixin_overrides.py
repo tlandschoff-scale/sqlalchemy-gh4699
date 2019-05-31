@@ -1,5 +1,6 @@
 # coding: utf-8
 import json
+import pickle
 
 from sqlalchemy import Column, Integer, String, ForeignKey, MetaData, Table, \
     create_engine, Boolean
@@ -41,10 +42,17 @@ file_table = Table(
     Column("content", String),
 )
 
+directory_table = Table(
+    "directory", metadata,
+    Column("id", ForeignKey("entry.id"), primary_key=True),
+    Column("resource_enc", String),  # for ResourcesBearer
+)
+
 executable_table = Table(
     "executable", metadata,
     Column("id", ForeignKey("file.id"), primary_key=True),
     Column("windowed", Boolean),
+    Column("resource_enc", String),  # for ResourcesBearer
 )
 
 directory_entry_table = Table(
@@ -86,6 +94,10 @@ class Resource(object):
 class ResourcesBearer(EntryCommon):
     """Mixin class to provide resource forks to filesystem entries."""
 
+    def __init__(self, resource_enc="json", **kwargs):
+        super(ResourcesBearer, self).__init__(**kwargs)
+        self.resource_enc = resource_enc
+
     @EntryCommon.filesystem.setter
     def filesystem(self, value):
         super(ResourcesBearer, type(self)).filesystem.__set__(self, value)
@@ -93,7 +105,14 @@ class ResourcesBearer(EntryCommon):
             res.filesystem = value
 
     def add_resource(self, name, value):
-        self._resources.append(Resource(name=name, value=json.dumps(value)))
+        encoder = self._lookup_encoder()
+        self._resources.append(Resource(name=name, value=encoder.dumps(value)))
+
+    def _lookup_encoder(self):
+        return {
+            "json": json,
+            "pickle": pickle
+        }[self.resource_enc]
 
 
 class File(EntryCommon):
@@ -117,8 +136,8 @@ class Directory(ResourcesBearer, EntryCommon):
 
 
 class Executable(ResourcesBearer, File):
-    def __init__(self, name, content=None, windowed=False):
-        super(Executable, self).__init__(name, content)
+    def __init__(self, name, content=None, windowed=False, **kwargs):
+        super(Executable, self).__init__(name=name, content=content, **kwargs)
         self.windowed = windowed
 
 
@@ -148,7 +167,7 @@ mapper(
 )
 mapper(File, file_table, inherits=EntryCommon, polymorphic_identity="file")
 mapper(
-    Directory, local_table=None,
+    Directory, local_table=directory_table,
     inherits=EntryCommon, polymorphic_identity="directory",
     properties={
         "filesystem": synonym("_filesystem"),  # for override of setter
@@ -192,7 +211,7 @@ videos.entries = [File(name="dancing.mp4", content="Cha Cha, Slow Fox and more")
 documents.filesystem = filesystem
 session.add(documents)
 programs = Directory(name="Programs")
-cmd_exe = Executable(name="cmd.exe")
+cmd_exe = Executable(name="cmd.exe", resource_enc="pickle")
 cmd_exe.add_resource("Icon", {"width": 32, "height": 32, "data": "binary icon"})
 programs.entries = [cmd_exe]
 programs.filesystem = filesystem
