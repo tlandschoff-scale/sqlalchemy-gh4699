@@ -32,7 +32,7 @@ resource_table = Table(
     Column("id", ForeignKey("entry.id"), primary_key=True),
     Column("name", String, primary_key=True),
     Column("fsid", Integer, ForeignKey("filesystem.fsid"), nullable=False),
-    Column("coded_value", String),
+    Column("value", String),
 )
 
 file_table = Table(
@@ -82,17 +82,10 @@ class Resource(object):
         self.name = name
         self.value = value
 
-    @property
-    def value(self):
-        return json.loads(self.coded_value)
-
-    @value.setter
-    def value(self, data):
-        self.coded_value = json.dumps(data)
-
 
 class ResourcesBearer(EntryCommon):
     """Mixin class to provide resource forks to filesystem entries."""
+
     @EntryCommon.filesystem.setter
     def filesystem(self, value):
         super(ResourcesBearer, type(self)).filesystem.__set__(self, value)
@@ -100,7 +93,7 @@ class ResourcesBearer(EntryCommon):
             res.filesystem = value
 
     def add_resource(self, name, value):
-        self._resources.append(Resource(name=name, value=value))
+        self._resources.append(Resource(name=name, value=json.dumps(value)))
 
 
 class File(EntryCommon):
