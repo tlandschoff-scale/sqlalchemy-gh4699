@@ -1,6 +1,8 @@
 # coding: utf-8
+
 import json
 import pickle
+import sys
 
 from sqlalchemy import Column, Integer, String, ForeignKey, MetaData, Table, \
     create_engine, Boolean
@@ -195,7 +197,8 @@ class Executable(ResourcesBearer, File, Base):
 
 # --[ Preparation ]------------------------------------------
 
-engine = create_engine("sqlite:///", echo=False)
+database_url = sys.argv[1] if len(sys.argv) > 1 else "sqlite:///"
+engine = create_engine(database_url, echo=False)
 metadata.create_all(engine)
 
 session = sessionmaker(engine)()
