@@ -6,7 +6,7 @@ import sys
 
 from sqlalchemy import Column, Integer, String, ForeignKey, \
     create_engine, Boolean
-from sqlalchemy.ext.declarative import declarative_base, synonym_for, DeclarativeMeta
+from sqlalchemy.ext.declarative import declarative_base, synonym_for, DeclarativeMeta, declared_attr
 from sqlalchemy.orm import relationship, backref, sessionmaker
 
 from sqlalchemy.ext.associationproxy import association_proxy
@@ -80,13 +80,13 @@ class Resource(Base):
 class ResourcesBearer(metaclass=abc.ABCMeta):
     """Mixin class to provide resource forks to filesystem entries."""
 
-    @property
-    @abc.abstractmethod
+    @declared_attr
+    def resource_enc(self):
+        return Column("resource_enc", String)
+
+    @declared_attr
     def _resources(self):
-        """
-        Subclasses must replace this by a orm.relationship to Resource
-        instances.
-        """
+        return relationship(Resource)
 
     def __init__(self, resource_enc="json", **kwargs):
         super(ResourcesBearer, self).__init__(**kwargs)
@@ -125,10 +125,7 @@ class Directory(ResourcesBearer, EntryCommon):
     __tablename__ = "directory"
 
     id = Column(ForeignKey("entry.id"), primary_key=True)
-    resource_enc = Column("resource_enc", String)  # for ResourcesBearer
-
     __mapper_args__ = {"polymorphic_identity": "directory"}
-    _resources = relationship(Resource)  # for ResourcesBearer
 
     entries = association_proxy("directory_entries", "entry")
 
@@ -171,10 +168,7 @@ class Executable(ResourcesBearer, File):
 
     id = Column(ForeignKey("file.id"), primary_key=True)
     windowed = Column(Boolean)
-    resource_enc = Column("resource_enc", String)  # for ResourcesBearer
-
     __mapper_args__ = {'polymorphic_identity': "executable"}
-    _resources = relationship(Resource)  # for ResourcesBearer
 
     def __init__(self, name, content=None, windowed=False, **kwargs):
         super(Executable, self).__init__(name=name, content=content, **kwargs)
