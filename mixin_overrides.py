@@ -7,7 +7,7 @@ import sys
 from sqlalchemy import Column, Integer, String, ForeignKey, MetaData, Table, \
     create_engine, Boolean
 from sqlalchemy.ext.declarative import declarative_base, synonym_for
-from sqlalchemy.orm import relationship, backref, sessionmaker, mapper, synonym
+from sqlalchemy.orm import relationship, backref, sessionmaker, mapper
 
 from sqlalchemy.ext.associationproxy import association_proxy
 
@@ -24,14 +24,6 @@ filesystem_table = Table(
     Column("backend", String, nullable=False),
 )
 
-entry_table = Table(
-    "entry", metadata,
-    Column("id", Integer, primary_key=True),
-    Column("fsid", Integer, ForeignKey("filesystem.fsid"), nullable=False),
-    Column("entry_type", String),
-    Column("name", String),
-)
-
 
 class FileSystem(object):
     def __init__(self, device, backend):
@@ -39,7 +31,17 @@ class FileSystem(object):
         self.backend = backend
 
 
-class EntryCommon(object):
+class EntryCommon(Base):
+    __tablename__ = "entry"
+
+    id = Column(Integer, primary_key=True)
+    fsid = Column(Integer, ForeignKey("filesystem.fsid"), nullable=False)
+    entry_type = Column("entry_type", String)
+    name = Column("name", String)
+
+    __mapper_args__ = {"polymorphic_on": entry_type}
+    _filesystem = relationship(FileSystem)
+
     def __init__(self, name, filesystem=None):
         self.name = name
         self.filesystem = filesystem
@@ -48,6 +50,7 @@ class EntryCommon(object):
     def filesystem(self):
         return self._filesystem
 
+    @synonym_for("_filesystem")
     @filesystem.setter
     def filesystem(self, value):
         self._filesystem = filesystem
@@ -72,7 +75,7 @@ class Resource(Base):
         self.value = value
 
 
-class ResourcesBearer(EntryCommon):
+class ResourcesBearer(object):
     """Mixin class to provide resource forks to filesystem entries."""
 
     def __init__(self, resource_enc="json", **kwargs):
@@ -97,17 +100,9 @@ class ResourcesBearer(EntryCommon):
 
 
 mapper(FileSystem, filesystem_table)
-mapper(
-    EntryCommon, entry_table,
-    properties={
-        "_filesystem": relationship(FileSystem),
-        "filesystem": synonym("_filesystem"),
-    },
-    polymorphic_on=entry_table.c.entry_type,
-)
 
 
-class File(EntryCommon, Base):
+class File(EntryCommon):
     __tablename__ = "file"
     id = Column(ForeignKey("entry.id"), primary_key=True)
     content = Column(String)
@@ -119,7 +114,7 @@ class File(EntryCommon, Base):
         self.content = content
 
 
-class Directory(ResourcesBearer, EntryCommon, Base):
+class Directory(ResourcesBearer, EntryCommon):
     __tablename__ = "directory"
 
     id = Column(ForeignKey("entry.id"), primary_key=True)
@@ -164,7 +159,7 @@ class DirectoryEntry(Base):
         return "<DirectoryEntry @ {0:x}>".format(id(self))
 
 
-class Executable(ResourcesBearer, File, Base):
+class Executable(ResourcesBearer, File):
     __tablename__ = "executable"
 
     id = Column(ForeignKey("file.id"), primary_key=True)
@@ -211,3 +206,6 @@ print(session.query(EntryCommon).filter_by(filesystem=filesystem).all())
 
 print("Directories on filesystem:")
 print(session.query(Directory).filter_by(filesystem=filesystem).all())
+
+print(Directory, Directory.__mro__)
+print(Executable, Executable.__mro__)
