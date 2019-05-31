@@ -18,18 +18,16 @@ class ABCDeclarativeMeta(DeclarativeMeta, abc.ABCMeta):
     pass
 
 
-metadata = MetaData()
-Base = declarative_base(metadata=metadata, metaclass=ABCDeclarativeMeta)
-
-filesystem_table = Table(
-    "filesystem", metadata,
-    Column("fsid", Integer, primary_key=True),
-    Column("device", String, nullable=False),
-    Column("backend", String, nullable=False),
-)
+Base = declarative_base(metaclass=ABCDeclarativeMeta)
 
 
-class FileSystem(object):
+class FileSystem(Base):
+    __tablename__ = "filesystem"
+
+    fsid = Column(Integer, primary_key=True)
+    device = Column(String, nullable=False)
+    backend = Column(String, nullable=False)
+
     def __init__(self, device, backend):
         self.device = device
         self.backend = backend
@@ -111,9 +109,6 @@ class ResourcesBearer(metaclass=abc.ABCMeta):
         }[self.resource_enc]
 
 
-mapper(FileSystem, filesystem_table)
-
-
 class File(EntryCommon):
     __tablename__ = "file"
     id = Column(ForeignKey("entry.id"), primary_key=True)
@@ -190,7 +185,7 @@ class Executable(ResourcesBearer, File):
 
 database_url = sys.argv[1] if len(sys.argv) > 1 else "sqlite:///"
 engine = create_engine(database_url, echo=False)
-metadata.create_all(engine)
+Base.metadata.create_all(engine)
 
 session = sessionmaker(engine)()
 
