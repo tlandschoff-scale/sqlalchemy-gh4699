@@ -6,7 +6,7 @@ import sys
 
 from sqlalchemy import Column, Integer, String, ForeignKey, MetaData, Table, \
     create_engine, Boolean
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.ext.declarative import declarative_base, synonym_for
 from sqlalchemy.orm import relationship, backref, sessionmaker, mapper, synonym
 
 from sqlalchemy.ext.associationproxy import association_proxy
@@ -44,18 +44,6 @@ file_table = Table(
     "file", metadata,
     Column("id", ForeignKey("entry.id"), primary_key=True),
     Column("content", String),
-)
-
-directory_table = Table(
-    "directory", metadata,
-    Column("id", ForeignKey("entry.id"), primary_key=True),
-    Column("resource_enc", String),  # for ResourcesBearer
-)
-
-directory_entry_table = Table(
-    "directory_entry", metadata,
-    Column("dir_id", Integer, ForeignKey("entry.id"), primary_key=True),
-    Column("entry_id", Integer, ForeignKey("entry.id"), primary_key=True),
 )
 
 
@@ -135,13 +123,22 @@ mapper(
 mapper(File, file_table, inherits=EntryCommon, polymorphic_identity="file")
 
 
-class Directory(ResourcesBearer, EntryCommon):
+class Directory(ResourcesBearer, EntryCommon, Base):
+    __tablename__ = "directory"
+
+    id = Column(ForeignKey("entry.id"), primary_key=True)
+    resource_enc = Column("resource_enc", String)  # for ResourcesBearer
+
+    __mapper_args__ = {"polymorphic_identity": "directory"}
+    _resources = relationship(Resource)  # for ResourcesBearer
+
     entries = association_proxy("directory_entries", "entry")
 
     def __init__(self, name, entries=(), **kwargs):
         super(Directory, self).__init__(name=name, **kwargs)
         self.entries = entries
 
+    @synonym_for("_filesystem")
     @EntryCommon.filesystem.setter
     def filesystem(self, value):
         super(Directory, type(self)).filesystem.__set__(self, value)
@@ -149,17 +146,19 @@ class Directory(ResourcesBearer, EntryCommon):
             entry.filesystem = value
 
 
-mapper(
-    Directory, local_table=directory_table,
-    inherits=EntryCommon, polymorphic_identity="directory",
-    properties={
-        "filesystem": synonym("_filesystem"),  # for override of setter
-        "_resources": relationship(Resource),  # for ResourcesBearer
-    }
-)
+class DirectoryEntry(Base):
+    __tablename__ = "directory_entry"
 
+    dir_id = Column("dir_id", Integer, ForeignKey("directory.id"), primary_key=True)
+    entry_id = Column("entry_id", Integer, ForeignKey("entry.id"), primary_key=True)
 
-class DirectoryEntry(object):
+    directory = relationship(
+        Directory,
+        primaryjoin=dir_id == Directory.id,
+        backref=backref("directory_entries", cascade='all,delete-orphan'),
+    )
+
+    entry = relationship(EntryCommon, foreign_keys=[entry_id])
 
     def __init__(self, entry):
         super(DirectoryEntry, self).__init__()
@@ -167,17 +166,6 @@ class DirectoryEntry(object):
 
     def __repr__(self):
         return "<DirectoryEntry @ {0:x}>".format(id(self))
-
-
-mapper(DirectoryEntry, directory_entry_table, properties={
-    "directory": relationship(
-        Directory,
-        primaryjoin=directory_entry_table.c.dir_id == entry_table.c.id,
-        backref=backref("directory_entries", cascade='all,delete-orphan'),
-    ),
-    "entry": relationship(EntryCommon,
-                          foreign_keys=[directory_entry_table.c.entry_id]),
-})
 
 
 class Executable(ResourcesBearer, File, Base):
