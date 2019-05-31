@@ -4,6 +4,7 @@ import pickle
 
 from sqlalchemy import Column, Integer, String, ForeignKey, MetaData, Table, \
     create_engine, Boolean
+from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, backref, sessionmaker, mapper, synonym
 
 from sqlalchemy.ext.associationproxy import association_proxy
@@ -12,6 +13,7 @@ from sqlalchemy.ext.associationproxy import association_proxy
 # --[ Schema and mapped classes ]------------------------------------------
 
 metadata = MetaData()
+Base = declarative_base(metadata=metadata)
 
 filesystem_table = Table(
     "filesystem", metadata,
@@ -45,13 +47,6 @@ file_table = Table(
 directory_table = Table(
     "directory", metadata,
     Column("id", ForeignKey("entry.id"), primary_key=True),
-    Column("resource_enc", String),  # for ResourcesBearer
-)
-
-executable_table = Table(
-    "executable", metadata,
-    Column("id", ForeignKey("file.id"), primary_key=True),
-    Column("windowed", Boolean),
     Column("resource_enc", String),  # for ResourcesBearer
 )
 
@@ -179,19 +174,19 @@ mapper(DirectoryEntry, directory_entry_table, properties={
 })
 
 
-class Executable(ResourcesBearer, File):
+class Executable(ResourcesBearer, File, Base):
+    __tablename__ = "executable"
+
+    id = Column(ForeignKey("file.id"), primary_key=True)
+    windowed = Column(Boolean)
+    resource_enc = Column("resource_enc", String)  # for ResourcesBearer
+
+    __mapper_args__ = {'polymorphic_identity': "executable"}
+    _resources = relationship(Resource)  # for ResourcesBearer
+
     def __init__(self, name, content=None, windowed=False, **kwargs):
         super(Executable, self).__init__(name=name, content=content, **kwargs)
         self.windowed = windowed
-
-
-mapper(
-    Executable, local_table=executable_table,
-    inherits=File, polymorphic_identity="executable",
-    properties={
-        "_resources": relationship(Resource),  # for ResourcesBearer
-    }
-)
 
 
 # --[ Preparation ]------------------------------------------
