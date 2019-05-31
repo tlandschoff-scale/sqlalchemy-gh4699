@@ -4,10 +4,10 @@ import json
 import pickle
 import sys
 
-from sqlalchemy import Column, Integer, String, ForeignKey, MetaData, Table, \
+from sqlalchemy import Column, Integer, String, ForeignKey, \
     create_engine, Boolean
 from sqlalchemy.ext.declarative import declarative_base, synonym_for, DeclarativeMeta
-from sqlalchemy.orm import relationship, backref, sessionmaker, mapper
+from sqlalchemy.orm import relationship, backref, sessionmaker
 
 from sqlalchemy.ext.associationproxy import association_proxy
 
