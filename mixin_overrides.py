@@ -158,6 +158,7 @@ mapper(
     Directory, local_table=None,
     inherits=EntryCommon, polymorphic_identity="directory",
     properties={
+        "filesystem": synonym("_filesystem"),  # for override of setter
         "_resources": relationship(Resource),  # for ResourcesBearer
     }
 )
@@ -207,3 +208,6 @@ session.commit()
 
 print("Content of filesystem:")
 print(session.query(EntryCommon).filter_by(filesystem=filesystem).all())
+
+print("Directories on filesystem:")
+print(session.query(Directory).filter_by(filesystem=filesystem).all())
