@@ -1,7 +1,8 @@
 # coding: utf-8
+import json
 
 from sqlalchemy import Column, Integer, String, ForeignKey, MetaData, Table, \
-    create_engine
+    create_engine, Boolean
 from sqlalchemy.orm import relationship, backref, sessionmaker, mapper
 
 from sqlalchemy.ext.associationproxy import association_proxy
@@ -26,10 +27,24 @@ entry_table = Table(
     Column("name", String),
 )
 
+resource_table = Table(
+    "resources", metadata,
+    Column("id", ForeignKey("entry.id"), primary_key=True),
+    Column("name", String, primary_key=True),
+    Column("fsid", Integer, ForeignKey("filesystem.fsid"), nullable=False),
+    Column("coded_value", String),
+)
+
 file_table = Table(
     "file", metadata,
     Column("id", ForeignKey("entry.id"), primary_key=True),
     Column("content", String),
+)
+
+executable_table = Table(
+    "executable", metadata,
+    Column("id", ForeignKey("file.id"), primary_key=True),
+    Column("windowed", Boolean),
 )
 
 directory_entry_table = Table(
@@ -62,13 +77,39 @@ class EntryCommon(object):
         return "<{0}: {1} ({2})>".format(self.__class__.__name__, self.name, self.id)
 
 
+class Resource(object):
+    def __init__(self, name, value):
+        self.name = name
+        self.value = value
+
+    @property
+    def value(self):
+        return json.loads(self.coded_value)
+
+    @value.setter
+    def value(self, data):
+        self.coded_value = json.dumps(data)
+
+
+class ResourcesBearer(EntryCommon):
+    """Mixin class to provide resource forks to filesystem entries."""
+    @EntryCommon.filesystem.setter
+    def filesystem(self, value):
+        super(ResourcesBearer, type(self)).filesystem.__set__(self, value)
+        for res in self._resources:
+            res.filesystem = value
+
+    def add_resource(self, name, value):
+        self._resources.append(Resource(name=name, value=value))
+
+
 class File(EntryCommon):
     def __init__(self, name, content):
         super(File, self).__init__(name=name)
         self.content = content
 
 
-class Directory(EntryCommon):
+class Directory(ResourcesBearer, EntryCommon):
     entries = association_proxy("directory_entries", "entry")
 
     def __init__(self, name, entries=(), **kwargs):
@@ -77,9 +118,15 @@ class Directory(EntryCommon):
 
     @EntryCommon.filesystem.setter
     def filesystem(self, value):
+        super(Directory, type(self)).filesystem.__set__(self, value)
         for entry in self.entries:
             entry.filesystem = value
-        super(Directory, type(self)).filesystem.__set__(self, value)
+
+
+class Executable(ResourcesBearer, File):
+    def __init__(self, name, content=None, windowed=False):
+        super(Executable, self).__init__(name, content)
+        self.windowed = windowed
 
 
 class DirectoryEntry(object):
@@ -98,8 +145,19 @@ mapper(
     properties={"_filesystem": relationship(FileSystem)},
     polymorphic_on=entry_table.c.entry_type,
 )
+mapper(
+    Resource, resource_table,
+    properties={"owner": relationship(EntryCommon),
+                "filesystem": relationship(FileSystem)}
+)
 mapper(File, file_table, inherits=EntryCommon, polymorphic_identity="file")
-mapper(Directory, local_table=None, inherits=EntryCommon, polymorphic_identity="directory")
+mapper(
+    Directory, local_table=None,
+    inherits=EntryCommon, polymorphic_identity="directory",
+    properties={
+        "_resources": relationship(Resource),  # for ResourcesBearer
+    }
+)
 mapper(DirectoryEntry, directory_entry_table, properties={
     "directory": relationship(
         Directory,
@@ -109,6 +167,13 @@ mapper(DirectoryEntry, directory_entry_table, properties={
     "entry": relationship(EntryCommon,
                           foreign_keys=[directory_entry_table.c.entry_id]),
 })
+mapper(
+    Executable, local_table=executable_table,
+    inherits=File, polymorphic_identity="executable",
+    properties={
+        "_resources": relationship(Resource),  # for ResourcesBearer
+    }
+)
 
 
 # --[ Preparation ]------------------------------------------
@@ -124,10 +189,17 @@ session.commit()
 
 documents = Directory(name="Documents")
 videos = Directory(name="Videos")
+videos.add_resource("Icon", {"width": 32, "height": 32, "data": "film reel"})
 documents.entries = [videos, Directory(name="Pictures")]
 videos.entries = [File(name="dancing.mp4", content="Cha Cha, Slow Fox and more")]
 documents.filesystem = filesystem
 session.add(documents)
+programs = Directory(name="Programs")
+cmd_exe = Executable(name="cmd.exe")
+cmd_exe.add_resource("Icon", {"width": 32, "height": 32, "data": "binary icon"})
+programs.entries = [cmd_exe]
+programs.filesystem = filesystem
+session.add(programs)
 session.commit()
 
 # Works fine, but accesses private relationship
