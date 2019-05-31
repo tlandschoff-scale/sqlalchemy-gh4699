@@ -56,24 +56,20 @@ class EntryCommon(object):
         return "<{0}: {1} ({2})>".format(self.__class__.__name__, self.name, self.id)
 
 
-class Resource(object):
+class Resource(Base):
+    __tablename__ = "resources"
+
+    id = Column(ForeignKey("entry.id"), primary_key=True)
+    name = Column(String, primary_key=True)
+    fsid = Column(Integer, ForeignKey("filesystem.fsid"), nullable=False)
+    value = Column(String)
+
+    owner = relationship(EntryCommon)
+    filesystem = relationship(FileSystem)
+
     def __init__(self, name, value):
         self.name = name
         self.value = value
-
-resource_table = Table(
-    "resources", metadata,
-    Column("id", ForeignKey("entry.id"), primary_key=True),
-    Column("name", String, primary_key=True),
-    Column("fsid", Integer, ForeignKey("filesystem.fsid"), nullable=False),
-    Column("value", String),
-)
-
-mapper(
-    Resource, resource_table,
-    properties={"owner": relationship(EntryCommon),
-                "filesystem": relationship(FileSystem)}
-)
 
 
 class ResourcesBearer(EntryCommon):
