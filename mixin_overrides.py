@@ -3,7 +3,7 @@ import json
 
 from sqlalchemy import Column, Integer, String, ForeignKey, MetaData, Table, \
     create_engine, Boolean
-from sqlalchemy.orm import relationship, backref, sessionmaker, mapper
+from sqlalchemy.orm import relationship, backref, sessionmaker, mapper, synonym
 
 from sqlalchemy.ext.associationproxy import association_proxy
 
@@ -142,7 +142,10 @@ class DirectoryEntry(object):
 mapper(FileSystem, filesystem_table)
 mapper(
     EntryCommon, entry_table,
-    properties={"_filesystem": relationship(FileSystem)},
+    properties={
+        "_filesystem": relationship(FileSystem),
+        "filesystem": synonym("_filesystem"),
+    },
     polymorphic_on=entry_table.c.entry_type,
 )
 mapper(
@@ -202,6 +205,5 @@ programs.filesystem = filesystem
 session.add(programs)
 session.commit()
 
-# Works fine, but accesses private relationship
 print("Content of filesystem:")
-print(session.query(EntryCommon).filter_by(_filesystem=filesystem).all())
+print(session.query(EntryCommon).filter_by(filesystem=filesystem).all())
