@@ -135,12 +135,6 @@ class Directory(ResourcesBearer, EntryCommon):
             entry.filesystem = value
 
 
-class Executable(ResourcesBearer, File):
-    def __init__(self, name, content=None, windowed=False, **kwargs):
-        super(Executable, self).__init__(name=name, content=content, **kwargs)
-        self.windowed = windowed
-
-
 class DirectoryEntry(object):
 
     def __init__(self, entry):
@@ -183,6 +177,14 @@ mapper(DirectoryEntry, directory_entry_table, properties={
     "entry": relationship(EntryCommon,
                           foreign_keys=[directory_entry_table.c.entry_id]),
 })
+
+
+class Executable(ResourcesBearer, File):
+    def __init__(self, name, content=None, windowed=False, **kwargs):
+        super(Executable, self).__init__(name=name, content=content, **kwargs)
+        self.windowed = windowed
+
+
 mapper(
     Executable, local_table=executable_table,
     inherits=File, polymorphic_identity="executable",
